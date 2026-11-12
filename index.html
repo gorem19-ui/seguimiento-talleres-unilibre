@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Seguimiento semanal de talleres – Bienestar Unilibre 2026-2</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="https://cdn.jsdelivr.net/npm/exifr@7/dist/lite.umd.js"></script>
 <style>
 :root{--bg:#f6f7f9;--ink:#1d2433;--mute:#667085;--line:#e4e7ec;--pri:#0b5c8f;--pri2:#e8f1f8;--ok:#1a7f4b;--okb:#e6f4ec;--warn:#a15c00;--warnb:#fdf1df;--bad:#b42318;--badb:#fdecea}
@@ -30,7 +30,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.kpi .v{font-size:22px;font-weight:700}
 a{color:var(--pri)}textarea{min-height:200px}
 img.prev{max-width:100%;max-height:260px;border-radius:8px;margin-top:8px}
-.hidden{display:none}#camO{position:fixed;inset:0;background:#000;z-index:99;display:flex;flex-direction:column}#camO video{flex:1;width:100%;object-fit:cover}#camO .bar{display:flex;gap:10px;padding:14px;background:#000}#camO .bar button{flex:1;padding:16px;font-size:17px}.cam{display:block;text-align:center;border:2px dashed var(--pri);color:var(--pri);background:var(--pri2);border-radius:10px;padding:14px;font-weight:600;cursor:pointer}
+.hidden{display:none}#camO{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99}#camO video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}#camO .bar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px 14px calc(14px + env(safe-area-inset-bottom));background:rgba(0,0,0,.6);z-index:2}#camO .bar button{flex:1;padding:16px;font-size:17px}.cam{display:block;text-align:center;border:2px dashed var(--pri);color:var(--pri);background:var(--pri2);border-radius:10px;padding:14px;font-weight:600;cursor:pointer}
 @media(max-width:600px){.logos img{height:56px}}
 </style>
 </head>
@@ -51,8 +51,9 @@ function borrar(){try{localStorage.removeItem('ses_talleres')}catch(e){}}
 function restaurar(){try{const x=JSON.parse(localStorage.getItem('ses_talleres')||'null');if(x&&x.token&&Date.now()-x.t<6*3600e3){S=x;return true}}catch(e){}return false}
 function vencida(e){if(/venci|ingrese de nuevo/i.test(String(e))){borrar();S={};vLogin();msg(document.getElementById('m'),'Su sesión venció. Ingrese de nuevo con su cédula.','i');return true}return false}
 /* Cámara dentro de la página: no sale del navegador, así el celular no recarga la página */
+const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 function camara(onFoto){
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return false;
+  if(IOS||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return false;
   const o=document.createElement('div');o.id='camO';o.innerHTML='<video autoplay playsinline muted></video><div class="bar"><button id="cX">Cancelar</button><button class="pri" id="cT">📸 Capturar</button></div>';
   document.body.appendChild(o);const v=o.querySelector('video');let st=null;
   const cerrar=()=>{if(st)st.getTracks().forEach(t=>t.stop());o.remove()};
