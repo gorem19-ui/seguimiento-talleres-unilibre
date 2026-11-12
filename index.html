@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Seguimiento semanal de talleres – Bienestar Unilibre 2026-2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/exifr@7/dist/lite.umd.js"></script>
+<style>
+:root{--bg:#f6f7f9;--ink:#1d2433;--mute:#667085;--line:#e4e7ec;--pri:#0b5c8f;--pri2:#e8f1f8;--ok:#1a7f4b;--okb:#e6f4ec;--warn:#a15c00;--warnb:#fdf1df;--bad:#b42318;--badb:#fdecea}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--pri);color:#fff;padding:16px 18px}header h1{margin:0;font-size:18px}header p{margin:3px 0 0;font-size:12px;opacity:.85}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h2{margin:0 0 6px;font-size:16px}.sub{color:var(--mute);font-size:13px;margin:0 0 12px}
+input,select,textarea,button{font:inherit}
+input[type=text],input[type=password],input[type=date],input[type=time],select,textarea{border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;background:#fff}
+button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 14px;cursor:pointer}
+button.pri{background:var(--pri);color:#fff;border-color:var(--pri)}button:disabled{opacity:.5}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}.tab{border:none;background:#fff;border:1px solid var(--line)}.tab.on{background:var(--pri2);color:var(--pri);border-color:var(--pri2);font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;font-weight:600}
+.ok{background:var(--okb);color:var(--ok)}.warn{background:var(--warnb);color:var(--warn)}.bad{background:var(--badb);color:var(--bad)}.mute{background:#f0f2f5;color:var(--mute)}
+.msg{padding:10px 12px;border-radius:8px;font-size:14px;margin:10px 0}.msg.e{background:var(--badb);color:var(--bad)}.msg.s{background:var(--okb);color:var(--ok)}.msg.i{background:var(--pri2);color:#0a4568}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:var(--mute);font-weight:600;padding:7px;border-bottom:1px solid var(--line);background:#fafbfc}td{padding:7px;border-bottom:1px solid var(--line);vertical-align:top}
+.ses{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px}
+.big{font-size:22px;font-weight:700}.small{font-size:12px;color:var(--mute)}
+.hidden{display:none}textarea{min-height:200px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.kpi .v{font-size:22px;font-weight:700}
+a{color:var(--pri)}
+img.prev{max-width:100%;max-height:260px;border-radius:8px;margin-top:8px}
+@media(max-width:600px){.ses{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header><h1>Seguimiento semanal de talleres</h1><p>Bienestar Universitario 2026-2 · Universidad Libre Seccional Cali · RECREAVALLE</p></header>
+<main id="app"></main>
+
+<script>
+const API='https://script.google.com/macros/s/AKfycbyOLbUG1TkHsapq_mV6mrgnui-09qtZO77r-yZy8NlJiKUJdMCurJTX49J80-H5-kmD/exec';
+const VISTA = new URLSearchParams(location.search).get('vista') || (location.hash==='#panel'?'panel':'');
+const DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const app=document.getElementById('app');
+let S={};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function d(s){const p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2])}
+function fecha(s){const x=d(s);return DIAS[x.getDay()]+' '+x.getDate()+' de '+MES[x.getMonth()]}
+function corta(s){const x=d(s);return DIAS[x.getDay()].slice(0,3)+' '+x.getDate()+'/'+(x.getMonth()+1)}
+function h12(t){let [h,m]=t.split(':').map(Number);return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' p. m.':' a. m.')}
+function mins(t){const p=t.split(':').map(Number);return p[0]*60+(p[1]||0)}
+function horas(ss){return ss.filter(x=>!x.anulada).reduce((a,x)=>a+mins(x.fin)-mins(x.inicio),0)/60}
+function fh(h){const m=Math.round(h*60);return Math.floor(m/60)+' h'+(m%60?' '+(m%60)+' min':'')}
+function add(s,n){const x=d(s);x.setDate(x.getDate()+n);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')}
+async function call(fn,...a){let r;try{r=await fetch(API,{method:'POST',credentials:'omit',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:a})})}catch(e){throw 'Sin conexión. Revise su internet e intente de nuevo.'}let j;try{j=await r.json()}catch(e){throw 'El servidor no respondió correctamente. Intente de nuevo.'}if(!j.ok)throw j.error;return j.data}
+function msg(el,t,k){el.innerHTML=t?'<div class="msg '+(k||'i')+'">'+esc(t)+'</div>':''}
+
+/* ======================= PROFESOR ======================= */
+function vLogin(){
+  app.innerHTML='<div class="card" style="max-width:420px;margin:30px auto"><h2>Ingreso de profesores</h2><p class="sub">Escriba su número de cédula, sin puntos.</p><input type="text" id="cc" inputmode="numeric" autocomplete="off" placeholder="Número de cédula"><div id="m"></div><button class="pri" id="go" style="width:100%;margin-top:10px">Ingresar</button></div>';
+  const go=async()=>{const b=document.getElementById('go');b.disabled=true;msg(document.getElementById('m'),'Verificando…');
+    try{S=await call('login',document.getElementById('cc').value);S.tab='hoy';vProf()}catch(e){msg(document.getElementById('m'),e,'e');b.disabled=false}};
+  document.getElementById('go').onclick=go;document.getElementById('cc').onkeydown=e=>{if(e.key==='Enter')go()};
+}
+function vProf(){
+  app.innerHTML='<div class="card"><div class="row" style="justify-content:space-between"><div><div class="small">'+esc(S.prof.area)+'</div><div class="big">'+esc(S.prof.taller)+'</div><div>'+esc(S.prof.profesor)+'</div></div><button id="out">Salir</button></div></div>'+
+   '<div class="tabs"><button class="tab" data-t="hoy">Registrar llegada / salida</button><button class="tab" data-t="sem">Mi semana y ajustes</button></div><div id="v"></div>';
+  document.getElementById('out').onclick=()=>{S={};vLogin()};
+  app.querySelectorAll('.tab').forEach(b=>{b.classList.toggle('on',b.dataset.t===S.tab);b.onclick=()=>{S.tab=b.dataset.t;vProf()}});
+  S.tab==='hoy'?vHoy():vSem();
+}
+
+// ---------- Momento 3: llegada / salida
+async function vHoy(){
+  const v=document.getElementById('v');v.innerHTML='<div class="card">Cargando sesiones de hoy…</div>';
+  let r;try{r=await call('sesionesHoy',S.token)}catch(e){v.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
+  if(!r.sesiones.length){v.innerHTML='<div class="card"><h2>'+fecha(r.hoy)+'</h2><p class="sub">No tiene sesiones programadas hoy.</p></div>';return}
+  v.innerHTML='<div class="card"><h2>'+fecha(r.hoy)+'</h2><p class="sub">Tome la foto en el lugar del taller. Se guardan la hora del sistema y su ubicación. No incluya estudiantes identificables en la foto.</p>'+
+   r.sesiones.map((s,i)=>'<div class="card" style="margin:10px 0"><b>'+h12(s.inicio)+' – '+h12(s.fin)+'</b>'+(s.etiqueta?' · '+esc(s.etiqueta):'')+
+   '<div class="row" style="margin-top:8px">'+est('Llegada',s.llegada)+est('Salida',s.salida)+'</div>'+
+   ((!s.llegada||!s.salida)?'<div style="margin-top:10px"><label class="small">Foto de evidencia</label><input type="file" accept="image/*" capture="environment" id="f'+i+'"><img id="p'+i+'" class="prev hidden"><input type="text" id="o'+i+'" placeholder="Observación (opcional)" style="margin-top:8px"><div class="row" style="margin-top:10px">'+
+   (!s.llegada?'<button class="pri" data-i="'+i+'" data-t="llegada">Registrar llegada</button>':'')+
+   (s.llegada&&!s.salida?'<button class="pri" data-i="'+i+'" data-t="salida">Registrar salida</button>':'')+'</div><div id="m'+i+'"></div></div>':'')+'</div>').join('')+'</div>';
+  r.sesiones.forEach((s,i)=>{const f=document.getElementById('f'+i);if(f)f.onchange=()=>{const p=document.getElementById('p'+i);if(f.files[0]){p.src=URL.createObjectURL(f.files[0]);p.classList.remove('hidden')}}});
+  v.querySelectorAll('button[data-t]').forEach(b=>b.onclick=()=>enviar(r.sesiones[b.dataset.i],b.dataset.i,b.dataset.t,b));
+}
+function est(l,h){return '<span class="pill '+(h?'ok':'mute')+'">'+l+': '+(h?esc(h):'sin registrar')+'</span>'}
+function ubicar(){return new Promise(ok=>{if(!navigator.geolocation)return ok(null);navigator.geolocation.getCurrentPosition(p=>ok({lat:p.coords.latitude,lng:p.coords.longitude,precision:Math.round(p.coords.accuracy),origen:'GPS del navegador'}),()=>ok(null),{enableHighAccuracy:true,timeout:15000,maximumAge:0})})}
+function reducir(file){return new Promise((ok,ko)=>{const img=new Image();img.onload=()=>{const k=Math.min(1,1280/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',0.8).split(',')[1])};img.onerror=()=>ko('No se pudo leer la foto.');img.src=URL.createObjectURL(file)})}
+async function enviar(s,i,tipo,b){
+  const m=document.getElementById('m'+i);const f=document.getElementById('f'+i);
+  if(!f.files[0]){msg(m,'Primero tome la foto.','e');return}
+  b.disabled=true;msg(m,'Obteniendo ubicación…');
+  const file=f.files[0];let u=await ubicar();let fotoHora='';
+  try{if(window.exifr){const ex=await exifr.parse(file,{gps:true,pick:['DateTimeOriginal','latitude','longitude']});
+    if(ex){if(ex.DateTimeOriginal){const t=new Date(ex.DateTimeOriginal);fotoHora=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')+' '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')}
+      if(!u&&ex.latitude!=null)u={lat:ex.latitude,lng:ex.longitude,precision:'',origen:'GPS de la foto'}}}}catch(e){}
+  if(!u){msg(m,'No se obtuvo la ubicación. Active la ubicación del celular y permita el acceso al navegador; se registrará como “Sin ubicación”.','e')}
+  msg(m,'Enviando…','i');
+  try{const foto=await reducir(file);
+    const r=await call('registrar',S.token,{sesion:s.sesion,tipo:tipo,foto:foto,mime:'image/jpeg',lat:u?u.lat:null,lng:u?u.lng:null,precision:u?u.precision:'',origen:u?u.origen:'',fotoHora:fotoHora,obs:document.getElementById('o'+i).value});
+    msg(m,(tipo==='llegada'?'Llegada':'Salida')+' registrada a las '+r.hora+'. '+r.estado,'s');setTimeout(vHoy,2500);
+  }catch(e){msg(m,e,'e');b.disabled=false}
+}
+
+// ---------- Momento 2: semana y ajustes
+async function vSem(){
+  const v=document.getElementById('v');
+  v.innerHTML='<div class="card"><label class="small">Semana</label><select id="sem">'+S.semanas.map(w=>'<option value="'+w+'"'+(w===S.semana?' selected':'')+'>'+corta(w)+' – '+corta(add(w,6))+'</option>').join('')+'</select></div><div id="sv"><div class="card">Cargando…</div></div>';
+  document.getElementById('sem').onchange=e=>{S.semana=e.target.value;cargarSem()};cargarSem();
+}
+async function cargarSem(){
+  const sv=document.getElementById('sv');sv.innerHTML='<div class="card">Cargando…</div>';
+  try{S.w=await call('getSemana',S.token,S.semana)}catch(e){sv.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
+  pintarSem();
+}
+function pasada(x){const w=S.w;return x.fecha<w.hoy||(x.fecha===w.hoy&&mins(x.inicio)<=mins(w.ahora))}
+function pintarSem(){
+  const w=S.w,sv=document.getElementById('sv');
+  const cls=w.estado==='Pendiente'?'warn':'ok';
+  const festW=w.base.some(x=>x.festivo);
+  sv.innerHTML='<div class="card"><div class="row" style="justify-content:space-between"><h2>Horario vigente</h2><span class="pill '+cls+'">'+esc(w.estado)+'</span></div>'+
+   (w.detalle?'<p class="small">'+esc(w.detalle)+'</p>':'')+
+   '<table><tr><th>Día</th><th>Horario</th><th></th></tr>'+w.vigentes.map(x=>'<tr><td>'+fecha(x.fecha)+'</td><td>'+h12(x.inicio)+' – '+h12(x.fin)+(x.etiqueta?' · '+esc(x.etiqueta):'')+'</td><td>'+(x.festivo?'<span class="pill warn">Festivo</span>':'')+'</td></tr>').join('')+'</table>'+
+   '<p class="small">Horas de la semana: <b>'+fh(w.horasRequeridas)+'</b>'+(festW?' · Esta semana tiene festivo: si una sesión cae en festivo, reubíquela con un ajuste para mantener las horas.':'')+'</p>'+
+   '<div class="row" style="margin-top:8px"><button class="pri" id="conf">Confirmo mi horario</button><button id="aj">Solicitar ajuste</button></div><div id="cm"></div></div><div id="aju"></div>';
+  document.getElementById('conf').onclick=async e=>{e.target.disabled=true;try{S.w=await call('confirmar',S.token,S.semana);pintarSem();msg(document.getElementById('cm'),'Horario confirmado.','s')}catch(x){msg(document.getElementById('cm'),x,'e');e.target.disabled=false}};
+  document.getElementById('aj').onclick=()=>{S.edit=w.vigentes.filter(x=>!x.festivo||pasada(x)).map(x=>Object.assign({},x,{bloq:pasada(x)}));pintarAj()};
+}
+function pintarAj(){
+  const w=S.w,a=document.getElementById('aju');const lun=w.semana,dom=add(lun,6)>w.fin?w.fin:add(lun,6);
+  const tot=horas(S.edit),req=w.horasRequeridas,okH=Math.abs(tot-req)<0.01;
+  a.innerHTML='<div class="card"><h2>Ajuste de la semana</h2><p class="sub">Mueva, divida o agregue sesiones. El ajuste se acepta automáticamente si la semana sigue sumando <b>'+fh(req)+'</b>. Las sesiones que ya pasaron no se pueden cambiar.</p>'+
+   S.edit.map((x,i)=>'<div class="ses"><input type="date" data-i="'+i+'" data-k="fecha" value="'+x.fecha+'" min="'+lun+'" max="'+dom+'"'+(x.bloq?' disabled':'')+'><input type="time" data-i="'+i+'" data-k="inicio" value="'+x.inicio+'"'+(x.bloq?' disabled':'')+'><input type="time" data-i="'+i+'" data-k="fin" value="'+x.fin+'"'+(x.bloq?' disabled':'')+'>'+(x.bloq?'<span class="small">Realizada</span>':'<button data-del="'+i+'">Quitar</button>')+'</div>').join('')+
+   '<button id="addS">+ Agregar sesión</button>'+
+   '<p>Total propuesto: <span class="pill '+(okH?'ok':'bad')+'">'+fh(tot)+' de '+fh(req)+'</span></p>'+
+   '<label class="small">Motivo del ajuste</label><input type="text" id="mot" placeholder="Ej.: actividad institucional, cambio de escenario…" value="'+esc(S.mot||'')+'">'+
+   '<div class="row" style="margin-top:10px"><button class="pri" id="env"'+(okH?'':' disabled')+'>Registrar ajuste</button><button id="can">Cancelar</button></div><div id="am"></div></div>';
+  a.querySelectorAll('input[data-i]').forEach(el=>el.onchange=()=>{S.edit[el.dataset.i][el.dataset.k]=el.value;S.mot=document.getElementById('mot').value;pintarAj()});
+  a.querySelectorAll('button[data-del]').forEach(b=>b.onclick=()=>{S.edit.splice(Number(b.dataset.del),1);S.mot=document.getElementById('mot').value;pintarAj()});
+  document.getElementById('addS').onclick=()=>{S.edit.push({fecha:w.hoy>lun&&w.hoy<=dom?w.hoy:lun,inicio:'08:00',fin:'09:00',etiqueta:''});S.mot=document.getElementById('mot').value;pintarAj()};
+  document.getElementById('can').onclick=()=>{a.innerHTML='';S.mot=''};
+  document.getElementById('env').onclick=async e=>{e.target.disabled=true;msg(document.getElementById('am'),'Registrando…');
+    try{S.w=await call('ajustar',S.token,S.semana,S.edit.map(x=>({fecha:x.fecha,inicio:x.inicio,fin:x.fin,etiqueta:x.etiqueta||''})),document.getElementById('mot').value);S.mot='';pintarSem();msg(document.getElementById('cm'),'Ajuste concertado y registrado. La coordinación recibió el aviso.','s')}
+    catch(x){msg(document.getElementById('am'),x,'e');e.target.disabled=false}};
+}
+
+/* ======================= PANEL COORDINACIÓN ======================= */
+function vClave(){
+  app.innerHTML='<div class="card" style="max-width:420px;margin:30px auto"><h2>Panel de coordinación</h2><input type="password" id="k" placeholder="Clave"><div id="m"></div><button class="pri" id="go" style="width:100%;margin-top:10px">Entrar</button></div>';
+  const go=async()=>{S.clave=document.getElementById('k').value;try{S.p=await call('panel',S.clave,'');S.tab='res';vPanel()}catch(e){msg(document.getElementById('m'),e,'e')}};
+  document.getElementById('go').onclick=go;document.getElementById('k').onkeydown=e=>{if(e.key==='Enter')go()};
+}
+async function recargar(sem){try{S.p=await call('panel',S.clave,sem);vPanel()}catch(e){alertBox(e)}}
+function alertBox(t){const m=document.getElementById('pm');if(m)msg(m,t,'e')}
+function vPanel(){
+  const p=S.p;const area=S.area||'';const T=p.talleres.filter(t=>!area||t.area===area);
+  let conf=0,aj=0,pend=0,prog=0,ven=0,ll=0,tar=0,fue=0,sin=0;
+  T.forEach(t=>{if(!t.concertacion)pend++;else if(t.concertacion.tipo==='ajuste')aj++;else conf++;
+    t.sesiones.forEach(s=>{prog++;if(s.vencida){ven++;if(!s.llegada)sin++}if(s.llegada){ll++;if(/Tarde/.test(s.llegada.estado))tar++;if(/Fuera|Sin ubicación/.test(s.llegada.estado))fue++}})});
+  app.innerHTML='<div class="card row" style="justify-content:space-between"><div class="row"><label class="small">Semana <select id="sem">'+p.semanas.map(w=>'<option value="'+w+'"'+(w===p.semana?' selected':'')+'>'+corta(w)+' – '+corta(add(w,6))+'</option>').join('')+'</select></label>'+
+   '<label class="small">Área <select id="ar"><option value="">Todas</option><option'+(area==='Cultura'?' selected':'')+'>Cultura</option><option'+(area==='Deporte'?' selected':'')+'>Deporte</option></select></label></div><button id="rf">Actualizar</button></div><div id="pm"></div>'+
+   '<div class="tabs"><button class="tab" data-t="res">Resumen</button><button class="tab" data-t="m1">1 · Comunicación</button><button class="tab" data-t="m2">2 · Concertación</button><button class="tab" data-t="m3">3 · Evaluación</button></div><div id="pv"></div>';
+  document.getElementById('sem').onchange=e=>recargar(e.target.value);
+  document.getElementById('ar').onchange=e=>{S.area=e.target.value;vPanel()};
+  document.getElementById('rf').onclick=()=>recargar(p.semana);
+  app.querySelectorAll('.tab').forEach(b=>{b.classList.toggle('on',b.dataset.t===S.tab);b.onclick=()=>{S.tab=b.dataset.t;vPanel()}});
+  const pv=document.getElementById('pv');
+  if(S.tab==='res'){
+    pv.innerHTML='<div class="kpis">'+k('Confirmados',conf+' / '+T.length)+k('Ajustes concertados',aj)+k('Sin concertar',pend)+k('Llegadas registradas',ll+' / '+prog)+k('Sesiones vencidas sin llegada',sin)+k('Llegadas tarde',tar)+k('Fuera de radio / sin ubicación',fue)+'</div>'+
+     '<div class="card"><h2>Alertas</h2><table><tr><th>Taller</th><th>Profesor</th><th>Alerta</th></tr>'+
+     T.map(t=>{const al=[];if(!t.concertacion)al.push(['warn','Sin concertar la semana']);t.sesiones.forEach(s=>{if(s.vencida&&!s.llegada)al.push(['bad','Sin llegada: '+corta(s.fecha)+' '+s.sesion]);if(s.llegada&&s.llegada.estado&&s.llegada.estado!=='A tiempo')al.push(['warn',corta(s.fecha)+' '+s.sesion+': '+s.llegada.estado])});
+       return al.map(a=>'<tr><td>'+esc(t.taller)+'</td><td>'+esc(t.profesor)+'</td><td><span class="pill '+a[0]+'">'+esc(a[1])+'</span></td></tr>').join('')}).join('')+'</table></div>';
+  }
+  if(S.tab==='m1'){
+    const txt=S.txt&&S.txtSem===p.semana?S.txt:mensaje(p);
+    pv.innerHTML='<div class="card"><h2>Momento 1 · Mensaje semanal para el grupo de WhatsApp</h2><textarea id="tx">'+esc(txt)+'</textarea><div class="row" style="margin-top:10px"><button class="pri" id="cp">Copiar</button><a id="wa" target="_blank" href="https://wa.me/?text='+encodeURIComponent(txt)+'"><button type="button">Abrir en WhatsApp</button></a><button id="rs">Restaurar texto</button></div><div id="cpm"></div></div>';
+    const tx=document.getElementById('tx');tx.oninput=()=>{S.txt=tx.value;S.txtSem=p.semana;document.getElementById('wa').href='https://wa.me/?text='+encodeURIComponent(tx.value)};
+    document.getElementById('cp').onclick=async()=>{try{await navigator.clipboard.writeText(tx.value);msg(document.getElementById('cpm'),'Copiado.','s')}catch(e){tx.select();document.execCommand('copy');msg(document.getElementById('cpm'),'Copiado.','s')}};
+    document.getElementById('rs').onclick=()=>{S.txt='';vPanel()};
+  }
+  if(S.tab==='m2'){
+    pv.innerHTML='<div class="card"><h2>Momento 2 · Concertación</h2><table><tr><th>Taller</th><th>Profesor</th><th>Estado</th><th>Horario vigente</th><th>Horas</th><th>Motivo</th></tr>'+
+     T.map(t=>'<tr><td>'+esc(t.taller)+'</td><td>'+esc(t.profesor)+'<br><span class="small">'+esc(t.telefono)+'</span></td><td>'+(t.concertacion?'<span class="pill '+(t.concertacion.tipo==='ajuste'?'warn':'ok')+'">'+(t.concertacion.tipo==='ajuste'?'Ajuste':'Confirmado')+'</span><br><span class="small">'+esc(t.concertacion.fecha)+'</span>':'<span class="pill mute">Pendiente</span>')+'</td><td class="small">'+
+       t.vigentes.map(x=>corta(x.fecha)+' '+h12(x.inicio)+'–'+h12(x.fin)+(x.festivo?' (festivo)':'')).join('<br>')+'</td><td>'+fh(t.horasVigentes)+(Math.abs(t.horasVigentes-t.horasRequeridas)>0.01?' <span class="pill bad">≠ '+fh(t.horasRequeridas)+'</span>':'')+'</td><td class="small">'+esc(t.concertacion&&t.concertacion.motivo||'')+'</td></tr>').join('')+'</table></div>';
+  }
+  if(S.tab==='m3'){
+    pv.innerHTML='<div class="card"><h2>Momento 3 · Evaluación</h2><table><tr><th>Taller</th><th>Sesión</th><th>Llegada</th><th>Salida</th></tr>'+
+     T.map(t=>t.sesiones.map((s,j)=>'<tr><td>'+(j?'':'<b>'+esc(t.taller)+'</b><br><span class="small">'+esc(t.profesor)+'</span>')+'</td><td>'+corta(s.fecha)+' '+esc(s.sesion)+'</td><td>'+reg(s.llegada,s.vencida)+'</td><td>'+reg(s.salida,s.vencida)+'</td></tr>').join('')).join('')+'</table></div>';
+  }
+}
+function k(l,v){return '<div class="kpi"><div class="small">'+esc(l)+'</div><div class="v">'+esc(v)+'</div></div>'}
+function reg(r,ven){if(!r)return ven?'<span class="pill bad">Sin registro</span>':'<span class="small">—</span>';
+  return esc(r.hora)+' <span class="pill '+(/Tarde|Fuera|Sin|anticipada|no reciente/.test(r.estado)?'warn':'ok')+'">'+esc(r.estado)+'</span>'+(r.dist!==''?' <span class="small">'+esc(r.dist)+' m</span>':'')+(r.foto?' · <a href="'+esc(r.foto)+'" target="_blank">foto</a>':'')}
+function mensaje(p){
+  const ini=p.semana,fin=add(ini,6);const fe=Object.keys(p.festivos).filter(x=>x>=ini&&x<=fin);
+  let m='👋 Buenos días, profes.\n\nIniciamos la semana del '+fecha(ini).toLowerCase()+' al '+fecha(fin).toLowerCase()+'. Les recordamos cumplir los horarios que cada uno propuso para su taller.\n\n'+
+   '✅ Confirmen su horario o, si necesitan un ajuste, regístrenlo en este enlace con su cédula (el ajuste se acepta si se mantienen las horas de la semana):\n'+p.url+'\n\n'+
+   '📸 En cada sesión registren su llegada y su salida con foto desde el mismo enlace.\n\n'+
+   '📧 Si es una novedad que les impide cumplir el horario, repórtenla a: '+p.correos+'.';
+  if(fe.length)m+='\n\n📅 Tengan en cuenta: '+fe.map(x=>fecha(x).toLowerCase()+', festivo ('+p.festivos[x]+')').join('; ')+'.';
+  return m+'\n\n¡Que tengan una excelente semana!';
+}
+
+VISTA==='panel'?vClave():vLogin();
+</script>
+</body>
+</html>
