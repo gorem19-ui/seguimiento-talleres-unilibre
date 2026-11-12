@@ -137,11 +137,14 @@ async function enviar(){
     msg(m,(S.reg.tipo==='llegada'?'Llegada':'Salida')+' registrada a las '+r.hora+'. '+r.estado,'s');setTimeout(vHoy,3000);
   }catch(e){msg(m,e,'e');document.querySelectorAll('#v button').forEach(x=>x.disabled=false)}
 }
+function cumple(r,x){if(r)return '<span class="pill '+(r.novedad||r.extemporaneo?'warn':'ok')+'">✓ '+esc(r.hora)+'</span>'+(r.extemporaneo?'<br><span class="small">Extemporáneo</span>':'');if(x.vencida)return '<span class="pill bad">✗ Pendiente</span>';if(x.enCurso)return '<span class="pill mute">En curso</span>';return '<span class="small">—</span>'}
 async function vSem(){
   const v=document.getElementById('v');v.innerHTML='<div class="card">Cargando…</div>';
   let r;try{r=await call('miSemana',S.token)}catch(e){v.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
   v.innerHTML='<div class="card"><h2>Semana del '+fecha(r.semana).toLowerCase()+' al '+fecha(add(r.semana,6)).toLowerCase()+'</h2>'+
-   (r.sesiones.length?'<table><tr><th>Día</th><th>Horario</th></tr>'+r.sesiones.map(x=>'<tr><td>'+fecha(x.fecha)+'</td><td>'+h12(x.inicio)+' – '+h12(x.fin)+(x.etiqueta?' · '+esc(x.etiqueta):'')+(x.festivo?' <span class="pill warn">Festivo</span>':'')+'</td></tr>').join('')+'</table>':'<p class="sub">No tiene sesiones programadas esta semana.</p>')+
+   (r.sesiones.length?'<div style="overflow-x:auto"><table><tr><th>Día</th><th>Horario</th><th>Llegada</th><th>Salida</th></tr>'+r.sesiones.map(x=>'<tr><td>'+fecha(x.fecha)+'</td><td>'+h12(x.inicio)+' – '+h12(x.fin)+(x.etiqueta?'<br><span class="small">'+esc(x.etiqueta)+'</span>':'')+'</td>'+
+     (x.festivo?'<td colspan="2"><span class="pill warn">Festivo</span></td>':'<td>'+cumple(x.llegada,x)+'</td><td>'+cumple(x.salida,x)+'</td>')+'</tr>').join('')+'</table></div>'+
+     '<p class="small" style="margin-top:8px"><span class="pill ok">✓</span> registrado · <span class="pill warn">✓</span> registrado con novedad o extemporáneo · <span class="pill bad">✗</span> pendiente: súbalo en «Registrar llegada / salida»</p>':'<p class="sub">No tiene sesiones programadas esta semana.</p>')+
    '<p class="small">Si debe dictar en otro horario o lugar, registre igual su llegada y salida: la aplicación le pedirá el motivo de la novedad.</p></div>';
 }
 
