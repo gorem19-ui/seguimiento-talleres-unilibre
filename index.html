@@ -30,7 +30,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.kpi .v{font-size:22px;font-weight:700}
 a{color:var(--pri)}textarea{min-height:200px}
 img.prev{max-width:100%;max-height:260px;border-radius:8px;margin-top:8px}
-.hidden{display:none}.cam{display:block;text-align:center;border:2px dashed var(--pri);color:var(--pri);background:var(--pri2);border-radius:10px;padding:14px;font-weight:600;cursor:pointer}
+.hidden{display:none}#camO{position:fixed;inset:0;background:#000;z-index:99;display:flex;flex-direction:column}#camO video{flex:1;width:100%;object-fit:cover}#camO .bar{display:flex;gap:10px;padding:14px;background:#000}#camO .bar button{flex:1;padding:16px;font-size:17px}.cam{display:block;text-align:center;border:2px dashed var(--pri);color:var(--pri);background:var(--pri2);border-radius:10px;padding:14px;font-weight:600;cursor:pointer}
 @media(max-width:600px){.logos img{height:56px}}
 </style>
 </head>
@@ -45,7 +45,22 @@ const VISTA=new URLSearchParams(location.search).get('vista')||(location.hash===
 const DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const app=document.getElementById('app');
-let S={};
+let S={};let FOTO=null,UBI=null;
+function guardar(){try{localStorage.setItem('ses_talleres',JSON.stringify({token:S.token,prof:S.prof,novedades:S.novedades,tab:S.tab,t:Date.now()}))}catch(e){}}
+function borrar(){try{localStorage.removeItem('ses_talleres')}catch(e){}}
+function restaurar(){try{const x=JSON.parse(localStorage.getItem('ses_talleres')||'null');if(x&&x.token&&Date.now()-x.t<6*3600e3){S=x;return true}}catch(e){}return false}
+function vencida(e){if(/venci|ingrese de nuevo/i.test(String(e))){borrar();S={};vLogin();msg(document.getElementById('m'),'Su sesión venció. Ingrese de nuevo con su cédula.','i');return true}return false}
+/* Cámara dentro de la página: no sale del navegador, así el celular no recarga la página */
+function camara(onFoto){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return false;
+  const o=document.createElement('div');o.id='camO';o.innerHTML='<video autoplay playsinline muted></video><div class="bar"><button id="cX">Cancelar</button><button class="pri" id="cT">📸 Capturar</button></div>';
+  document.body.appendChild(o);const v=o.querySelector('video');let st=null;
+  const cerrar=()=>{if(st)st.getTracks().forEach(t=>t.stop());o.remove()};
+  o.querySelector('#cX').onclick=cerrar;
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}},audio:false}).then(s=>{st=s;v.srcObject=s}).catch(()=>{cerrar();onFoto(null,true)});
+  o.querySelector('#cT').onclick=()=>{if(!v.videoWidth)return;const k=Math.min(1,1280/Math.max(v.videoWidth,v.videoHeight));const c=document.createElement('canvas');c.width=Math.round(v.videoWidth*k);c.height=Math.round(v.videoHeight*k);c.getContext('2d').drawImage(v,0,0,c.width,c.height);c.toBlob(b=>{cerrar();onFoto(b,false)},'image/jpeg',0.85)};
+  return true;
+}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function d(s){const p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2])}
 function fecha(s){const x=d(s);return DIAS[x.getDay()]+' '+x.getDate()+' de '+MES[x.getMonth()]}
@@ -59,20 +74,20 @@ function msg(el,t,k){el.innerHTML=t?'<div class="msg '+(k||'i')+'">'+esc(t)+'</d
 function vLogin(){
   app.innerHTML='<div class="card" style="max-width:420px;margin:30px auto"><h2>Ingreso de profesores</h2><p class="sub">Escriba su número de cédula, sin puntos.</p><input type="text" id="cc" inputmode="numeric" autocomplete="off" placeholder="Número de cédula"><div id="m"></div><button class="pri big" id="go" style="margin-top:10px">Ingresar</button></div>';
   const go=async()=>{const b=document.getElementById('go');b.disabled=true;msg(document.getElementById('m'),'Verificando…');
-    try{S=await call('login',document.getElementById('cc').value);S.tab='hoy';vProf()}catch(e){msg(document.getElementById('m'),e,'e');b.disabled=false}};
+    try{S=await call('login',document.getElementById('cc').value);S.tab='hoy';guardar();vProf()}catch(e){msg(document.getElementById('m'),e,'e');b.disabled=false}};
   document.getElementById('go').onclick=go;document.getElementById('cc').onkeydown=e=>{if(e.key==='Enter')go()};
 }
 function vProf(){
   app.innerHTML='<div class="card"><div class="row" style="justify-content:space-between"><div><div class="small">'+esc(S.prof.area)+'</div><div class="big">'+esc(S.prof.taller)+'</div><div>'+esc(S.prof.profesor)+'</div></div><button id="out">Salir</button></div></div>'+
    '<div class="tabs"><button class="tab" data-t="hoy">Registrar llegada / salida</button><button class="tab" data-t="sem">Mi horario</button></div><div id="v"></div>';
-  document.getElementById('out').onclick=()=>{S={};vLogin()};
-  app.querySelectorAll('.tab').forEach(b=>{b.classList.toggle('on',b.dataset.t===S.tab);b.onclick=()=>{S.tab=b.dataset.t;vProf()}});
+  document.getElementById('out').onclick=()=>{S={};borrar();vLogin()};
+  app.querySelectorAll('.tab').forEach(b=>{b.classList.toggle('on',b.dataset.t===S.tab);b.onclick=()=>{S.tab=b.dataset.t;guardar();vProf()}});
   S.tab==='hoy'?vHoy():vSem();
 }
 
 async function vHoy(){
   const v=document.getElementById('v');v.innerHTML='<div class="card">Cargando…</div>';
-  let r;try{r=await call('hoy',S.token)}catch(e){v.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
+  let r;try{r=await call('hoy',S.token)}catch(e){if(vencida(e))return;v.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
   S.h=r;const tipo=r.siguiente;const T=tipo==='llegada'?'llegada':'salida';
   const pend=(r.pendientes||[]);
   const pendH=pend.length?'<div class="card" style="border:2px solid var(--bad)"><h2 style="color:var(--bad)">Tiene '+pend.length+' registro'+(pend.length>1?'s':'')+' pendiente'+(pend.length>1?'s':'')+'</h2><p class="sub">Son sesiones programadas que pasaron sin foto de '+'llegada o salida. Súbala para subsanarlas.</p>'+
@@ -80,10 +95,13 @@ async function vHoy(){
   v.innerHTML=pendH+'<div class="card"><h2>'+fecha(r.hoy)+'</h2>'+
    '<p class="sub">'+(r.sesiones.length?'Sesiones programadas hoy: '+r.sesiones.map(s=>h12(s.inicio)+' – '+h12(s.fin)+(s.etiqueta?' ('+esc(s.etiqueta)+')':'')).join(' · '):(r.festivo?'Hoy es festivo: no hay sesiones programadas.':'Hoy no tiene sesiones programadas.'))+'</p>'+
    (r.registros.length?'<div class="row" style="margin-bottom:10px">'+r.registros.map(x=>'<span class="pill '+(/A tiempo|Completa/.test(x.estado)&&!/Fuera|Sin ubic/.test(x.estado)?'ok':'warn')+'">'+(x.tipo==='llegada'?'Llegada':'Salida')+' '+esc(x.hora)+'</span>').join('')+'</div>':'')+
-   '<div class="small" style="margin-bottom:6px">Foto de evidencia: tómela en el lugar del taller, sin estudiantes identificables.</div><label for="f" class="cam" id="camL">📷 Tomar foto</label><input type="file" accept="image/*" capture="environment" id="f" class="hidden"><img id="p" class="prev hidden">'+
+   '<div class="small" style="margin-bottom:6px">Foto de evidencia: tómela en el lugar del taller, sin estudiantes identificables.</div><div class="cam" id="camL" role="button">📷 Tomar foto</div><input type="file" accept="image/*" capture="environment" id="f" class="hidden"><img id="p" class="prev hidden">'+
    '<input type="text" id="o" placeholder="Observación (opcional)" style="margin-top:8px">'+
    '<button class="pri big" id="b" style="margin-top:12px">Registrar '+T+'</button><div id="nv"></div><div id="m"></div></div>';
-  const f=document.getElementById('f');f.onchange=()=>{const p=document.getElementById('p');if(f.files[0]){p.src=URL.createObjectURL(f.files[0]);p.classList.remove('hidden');document.getElementById('camL').textContent='📷 Cambiar foto'}};
+  FOTO=null;UBI=null;
+  const ver=b=>{FOTO=b;const p=document.getElementById('p');p.src=URL.createObjectURL(b);p.classList.remove('hidden');document.getElementById('camL').textContent='📷 Cambiar foto'};
+  const f=document.getElementById('f');f.onchange=()=>{if(f.files[0])ver(f.files[0])};
+  document.getElementById('camL').onclick=()=>{ubicar().then(u=>{UBI=u});if(!camara((b,fallo)=>{if(b)ver(b);else if(fallo)f.click()}))f.click()};
   document.getElementById('b').onclick=()=>paso1(tipo);
   v.querySelectorAll('button[data-p]').forEach(b=>b.onclick=()=>formSub(pend[b.dataset.p],b.dataset.p));
 }
@@ -109,15 +127,15 @@ function ubicar(){return new Promise(ok=>{if(!navigator.geolocation)return ok(nu
 function reducir(file){return new Promise((ok,ko)=>{const img=new Image();img.onload=()=>{const k=Math.min(1,1280/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',0.8).split(',')[1])};img.onerror=()=>ko('No se pudo leer la foto.');img.src=URL.createObjectURL(file)})}
 async function paso1(tipo){
   const m=document.getElementById('m'),f=document.getElementById('f'),b=document.getElementById('b');
-  if(!f.files[0]){msg(m,'Primero tome la foto.','e');return}
+  if(!FOTO){msg(m,'Primero tome la foto.','e');return}
   b.disabled=true;msg(m,'Obteniendo ubicación…');
-  const file=f.files[0];let u=await ubicar();let fotoHora='';
+  const file=FOTO;let u=UBI||await ubicar();let fotoHora='';
   try{if(window.exifr){const ex=await exifr.parse(file,{gps:true,pick:['DateTimeOriginal','latitude','longitude']});
     if(ex){if(ex.DateTimeOriginal){const t=new Date(ex.DateTimeOriginal);fotoHora=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')+' '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')}
       if(!u&&ex.latitude!=null)u={lat:ex.latitude,lng:ex.longitude,precision:'',origen:'GPS de la foto'}}}}catch(e){}
   S.reg={tipo:tipo,lat:u?u.lat:null,lng:u?u.lng:null,precision:u?u.precision:'',origen:u?u.origen:'',fotoHora:fotoHora};
   msg(m,'Verificando horario y ubicación…');
-  let ev;try{ev=await call('evaluar',S.token,{tipo:tipo,lat:S.reg.lat,lng:S.reg.lng})}catch(e){msg(m,e,'e');b.disabled=false;return}
+  let ev;try{ev=await call('evaluar',S.token,{tipo:tipo,lat:S.reg.lat,lng:S.reg.lng})}catch(e){if(vencida(e))return;msg(m,e,'e');b.disabled=false;return}
   if(!ev.requiereNovedad){msg(m,'');enviar();return}
   msg(m,'');
   document.getElementById('nv').innerHTML='<div class="nov"><b>Este registro queda por fuera de lo programado:</b><ul style="margin:6px 0 10px;padding-left:18px">'+
@@ -133,15 +151,15 @@ async function paso1(tipo){
 async function enviar(){
   const m=document.getElementById('m');msg(m,'Enviando registro…');
   document.querySelectorAll('#v button').forEach(x=>x.disabled=true);
-  try{const foto=await reducir(document.getElementById('f').files[0]);
+  try{const foto=await reducir(FOTO);
     const r=await call('registrar',S.token,Object.assign({},S.reg,{foto:foto,obs:document.getElementById('o').value}));
-    msg(m,(S.reg.tipo==='llegada'?'Llegada':'Salida')+' registrada a las '+r.hora+'. '+r.estado,'s');setTimeout(vHoy,3000);
-  }catch(e){msg(m,e,'e');document.querySelectorAll('#v button').forEach(x=>x.disabled=false)}
+    FOTO=null;document.getElementById('v').innerHTML='<div class="card" style="text-align:center;border:2px solid var(--ok)"><div style="font-size:48px">✅</div><h2>'+(S.reg.tipo==='llegada'?'Llegada':'Salida')+' registrada</h2><p class="big">'+esc(r.hora)+'</p><p class="sub">'+esc(r.estado)+'</p><button class="pri big" id="vv">Continuar</button></div>';document.getElementById('vv').onclick=vHoy;
+  }catch(e){if(vencida(e))return;msg(m,e,'e');document.querySelectorAll('#v button').forEach(x=>x.disabled=false)}
 }
 function cumple(r,x){if(r)return '<span class="pill '+(r.novedad||r.extemporaneo?'warn':'ok')+'">✓ '+esc(r.hora)+'</span>'+(r.extemporaneo?'<br><span class="small">Extemporáneo</span>':'');if(x.fecha<'2026-11-12')return '<span class="small">Antes del control</span>';if(x.vencida)return '<span class="pill bad">✗ Pendiente</span>';if(x.enCurso)return '<span class="pill mute">En curso</span>';return '<span class="small">—</span>'}
 async function vSem(){
   const v=document.getElementById('v');v.innerHTML='<div class="card">Cargando…</div>';
-  let r;try{r=await call('miSemana',S.token)}catch(e){v.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
+  let r;try{r=await call('miSemana',S.token)}catch(e){if(vencida(e))return;v.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
   v.innerHTML='<div class="card"><h2>Semana del '+fecha(r.semana).toLowerCase()+' al '+fecha(add(r.semana,6)).toLowerCase()+'</h2>'+
    (r.sesiones.length?'<div style="overflow-x:auto"><table><tr><th>Día</th><th>Horario</th><th>Llegada</th><th>Salida</th></tr>'+r.sesiones.map(x=>'<tr><td>'+fecha(x.fecha)+'</td><td>'+h12(x.inicio)+' – '+h12(x.fin)+(x.etiqueta?'<br><span class="small">'+esc(x.etiqueta)+'</span>':'')+'</td>'+
      (x.festivo?'<td colspan="2"><span class="pill warn">Festivo</span></td>':'<td>'+cumple(x.llegada,x)+'</td><td>'+cumple(x.salida,x)+'</td>')+'</tr>').join('')+'</table></div>'+
@@ -210,7 +228,7 @@ function mensaje(p){
   if(fe.length)m+='\n\n📅 Tengan en cuenta: '+fe.map(x=>fecha(x).toLowerCase()+', festivo ('+p.festivos[x]+')').join('; ')+'.';
   return m+'\n\n¡Que tengan una excelente semana!';
 }
-VISTA==='panel'?vClave():vLogin();
+VISTA==='panel'?vClave():(restaurar()?vProf():vLogin());
 </script>
 </body>
 </html>
