@@ -73,7 +73,10 @@ async function vHoy(){
   const v=document.getElementById('v');v.innerHTML='<div class="card">Cargando…</div>';
   let r;try{r=await call('hoy',S.token)}catch(e){v.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
   S.h=r;const tipo=r.siguiente;const T=tipo==='llegada'?'llegada':'salida';
-  v.innerHTML='<div class="card"><h2>'+fecha(r.hoy)+'</h2>'+
+  const pend=(r.pendientes||[]);
+  const pendH=pend.length?'<div class="card" style="border:2px solid var(--bad)"><h2 style="color:var(--bad)">Tiene '+pend.length+' registro'+(pend.length>1?'s':'')+' pendiente'+(pend.length>1?'s':'')+'</h2><p class="sub">Son sesiones programadas que pasaron sin foto de '+'llegada o salida. Súbala para subsanarlas.</p>'+
+    pend.map((p,i)=>'<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding:10px 0"><div><b>'+fecha(p.fecha)+'</b><br><span class="small">Sesión '+h12(p.sesion.split('-')[0])+' – '+h12(p.sesion.split('-')[1])+' · falta '+esc(p.falta)+'</span></div><button data-p="'+i+'">Subsanar</button></div><div id="ps'+i+'"></div>').join('')+'</div>':'';
+  v.innerHTML=pendH+'<div class="card"><h2>'+fecha(r.hoy)+'</h2>'+
    '<p class="sub">'+(r.sesiones.length?'Sesiones programadas hoy: '+r.sesiones.map(s=>h12(s.inicio)+' – '+h12(s.fin)+(s.etiqueta?' ('+esc(s.etiqueta)+')':'')).join(' · '):(r.festivo?'Hoy es festivo: no hay sesiones programadas.':'Hoy no tiene sesiones programadas.'))+'</p>'+
    (r.registros.length?'<div class="row" style="margin-bottom:10px">'+r.registros.map(x=>'<span class="pill '+(/A tiempo|Completa/.test(x.estado)&&!/Fuera|Sin ubic/.test(x.estado)?'ok':'warn')+'">'+(x.tipo==='llegada'?'Llegada':'Salida')+' '+esc(x.hora)+'</span>').join('')+'</div>':'')+
    '<div class="small" style="margin-bottom:6px">Foto de evidencia: tómela en el lugar del taller, sin estudiantes identificables.</div><label for="f" class="cam" id="camL">📷 Tomar foto</label><input type="file" accept="image/*" capture="environment" id="f" class="hidden"><img id="p" class="prev hidden">'+
@@ -81,6 +84,25 @@ async function vHoy(){
    '<button class="pri big" id="b" style="margin-top:12px">Registrar '+T+'</button><div id="nv"></div><div id="m"></div></div>';
   const f=document.getElementById('f');f.onchange=()=>{const p=document.getElementById('p');if(f.files[0]){p.src=URL.createObjectURL(f.files[0]);p.classList.remove('hidden');document.getElementById('camL').textContent='📷 Cambiar foto'}};
   document.getElementById('b').onclick=()=>paso1(tipo);
+  v.querySelectorAll('button[data-p]').forEach(b=>b.onclick=()=>formSub(pend[b.dataset.p],b.dataset.p));
+}
+function formSub(p,i){
+  document.querySelectorAll('[id^=ps]').forEach(x=>x.innerHTML='');
+  const box=document.getElementById('ps'+i);
+  box.innerHTML='<div class="nov"><b>Subsanar '+fecha(p.fecha).toLowerCase()+' ('+esc(p.sesion)+')</b><p class="small" style="margin:6px 0 10px">Adjunte una foto de la sesión (puede tomarla ahora o elegirla de su galería) y explique por qué no la registró a tiempo.</p>'+
+    '<label for="sf" class="cam" id="sfL">📷 Tomar o elegir foto</label><input type="file" accept="image/*" id="sf" class="hidden"><img id="sp" class="prev hidden">'+
+    '<label class="small" style="display:block;margin-top:10px">Motivo</label><select id="snov"><option value="">Seleccione…</option>'+S.novedades.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select>'+
+    '<textarea id="sdet" placeholder="¿Por qué no registró a tiempo? (obligatorio)" style="min-height:70px;margin-top:8px"></textarea>'+
+    '<div class="row" style="margin-top:10px"><button class="pri" id="sok">Enviar</button><button id="scan">Cancelar</button></div><div id="sm"></div></div>';
+  const f=document.getElementById('sf');f.onchange=()=>{const im=document.getElementById('sp');if(f.files[0]){im.src=URL.createObjectURL(f.files[0]);im.classList.remove('hidden');document.getElementById('sfL').textContent='📷 Cambiar foto'}};
+  document.getElementById('scan').onclick=()=>{box.innerHTML=''};
+  document.getElementById('sok').onclick=async()=>{const m=document.getElementById('sm');const n=document.getElementById('snov').value,dt=document.getElementById('sdet').value.trim();
+    if(!f.files[0]){msg(m,'Adjunte la foto.','e');return}if(!n){msg(m,'Seleccione el motivo.','e');return}if(dt.length<5){msg(m,'Explique por qué no registró a tiempo.','e');return}
+    const b=document.getElementById('sok');b.disabled=true;msg(m,'Enviando…');
+    let u=await ubicar();let fotoHora='';
+    try{if(window.exifr){const ex=await exifr.parse(f.files[0],{gps:true,pick:['DateTimeOriginal','latitude','longitude']});if(ex){if(ex.DateTimeOriginal){const t=new Date(ex.DateTimeOriginal);fotoHora=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')+' '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')}if(!u&&ex.latitude!=null)u={lat:ex.latitude,lng:ex.longitude,precision:'',origen:'GPS de la foto'}}}}catch(e){}
+    try{const foto=await reducir(f.files[0]);await call('subsanar',S.token,{clave:p.clave,foto:foto,novedad:n,detalle:dt,lat:u?u.lat:null,lng:u?u.lng:null,precision:u?u.precision:'',origen:u?u.origen:'',fotoHora:fotoHora});
+      msg(m,'Pendiente subsanado. Queda marcado como registro extemporáneo.','s');setTimeout(vHoy,2500)}catch(e){msg(m,e,'e');b.disabled=false}};
 }
 function ubicar(){return new Promise(ok=>{if(!navigator.geolocation)return ok(null);navigator.geolocation.getCurrentPosition(p=>ok({lat:p.coords.latitude,lng:p.coords.longitude,precision:Math.round(p.coords.accuracy),origen:'GPS del celular'}),()=>ok(null),{enableHighAccuracy:true,timeout:15000,maximumAge:0})})}
 function reducir(file){return new Promise((ok,ko)=>{const img=new Image();img.onload=()=>{const k=Math.min(1,1280/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',0.8).split(',')[1])};img.onerror=()=>ko('No se pudo leer la foto.');img.src=URL.createObjectURL(file)})}
@@ -132,12 +154,12 @@ function vClave(){
 async function recargar(sem){try{S.p=await call('panel',S.clave,sem);vPanel()}catch(e){const m=document.getElementById('pm');if(m)msg(m,e,'e')}}
 function vPanel(){
   const p=S.p;const area=S.area||'';const T=p.talleres.filter(t=>!area||t.area===area);
-  let prog=0,ll=0,sin=0,fh=0,fr=0;
+  let prog=0,ll=0,sin=0,fh=0,fr=0;const P=(p.pendientes||[]).filter(x=>!area||T.some(t=>t.id===x.id));const abiertos=P.filter(x=>x.estado==='Pendiente').length;
   T.forEach(t=>{t.sesiones.forEach(s=>{prog++;if(s.llegada)ll++;else if(s.vencida)sin++});t.registros.forEach(r=>{if(r.fueraHorario)fh++;if(r.fueraRango)fr++})});
   const areas=[...new Set(p.talleres.map(t=>t.area))];
   app.innerHTML='<div class="card row" style="justify-content:space-between"><div class="row"><label class="small">Semana <select id="sem">'+p.semanas.map(w=>'<option value="'+w+'"'+(w===p.semana?' selected':'')+'>'+corta(w)+' – '+corta(add(w,6))+'</option>').join('')+'</select></label>'+
    '<label class="small">Área <select id="ar"><option value="">Todas</option>'+areas.map(a=>'<option'+(area===a?' selected':'')+'>'+esc(a)+'</option>').join('')+'</select></label></div><button id="rf">Actualizar</button></div><div id="pm"></div>'+
-   '<div class="tabs"><button class="tab" data-t="res">Resumen</button><button class="tab" data-t="m1">Mensaje semanal</button><button class="tab" data-t="ses">Sesiones</button><button class="tab" data-t="nov">Novedades</button></div><div id="pv"></div>';
+   '<div class="tabs"><button class="tab" data-t="res">Resumen</button><button class="tab" data-t="m1">Mensaje semanal</button><button class="tab" data-t="ses">Sesiones</button><button class="tab" data-t="nov">Novedades</button><button class="tab" data-t="pen">Pendientes'+(abiertos?' ('+abiertos+')':'')+'</button></div><div id="pv"></div>';
   document.getElementById('sem').onchange=e=>recargar(e.target.value);
   document.getElementById('ar').onchange=e=>{S.area=e.target.value;vPanel()};
   document.getElementById('rf').onclick=()=>recargar(p.semana);
@@ -145,10 +167,15 @@ function vPanel(){
   const pv=document.getElementById('pv');
   const novs=[];T.forEach(t=>t.registros.forEach(r=>{if(r.fueraHorario||r.fueraRango)novs.push([t,r])}));
   if(S.tab==='res'){
-    pv.innerHTML='<div class="kpis">'+k('Sesiones programadas',prog)+k('Con llegada registrada',ll)+k('Vencidas sin registro',sin)+k('Registros fuera de horario',fh)+k('Registros fuera de rango',fr)+'</div>'+
+    pv.innerHTML='<div class="kpis">'+k('Sesiones programadas',prog)+k('Con llegada registrada',ll)+k('Vencidas sin registro',sin)+k('Registros fuera de horario',fh)+k('Registros fuera de rango',fr)+k('Pendientes sin subsanar',abiertos)+'</div>'+
      '<div class="card"><h2>Alertas</h2><table><tr><th>Taller</th><th>Profesor</th><th>Alerta</th></tr>'+
      T.map(t=>t.sesiones.filter(s=>s.vencida&&!s.llegada).map(s=>'<tr><td>'+esc(t.taller)+'</td><td>'+esc(t.profesor)+'</td><td><span class="pill bad">Sin registro: '+corta(s.fecha)+' '+esc(s.sesion)+'</span></td></tr>').join('')).join('')+
      novs.map(([t,r])=>'<tr><td>'+esc(t.taller)+'</td><td>'+esc(t.profesor)+'</td><td><span class="pill warn">'+corta(r.fecha)+' '+esc(r.hora)+' · '+esc(r.estado)+'</span><br><span class="small">Motivo: '+esc(r.novedad)+(r.detalle?' — '+esc(r.detalle):'')+'</span></td></tr>').join('')+'</table></div>';
+  }
+  if(S.tab==='pen'){
+    const ord=P.slice().sort((a,b)=>(a.estado==='Pendiente'?0:1)-(b.estado==='Pendiente'?0:1)||b.fecha.localeCompare(a.fecha));
+    pv.innerHTML='<div class="card"><h2>Registros pendientes</h2><p class="sub">Sesiones programadas que pasaron sin foto de llegada o de salida. El profesor las ve al entrar y las puede subsanar con foto y motivo.</p><div style="overflow-x:auto"><table><tr><th>Sesión</th><th>Taller</th><th>Falta</th><th>Estado</th><th>Motivo</th><th>Foto</th></tr>'+
+     (ord.length?ord.map(x=>'<tr><td>'+corta(x.fecha)+' '+esc(x.sesion)+'</td><td>'+esc(x.taller)+'<br><span class="small">'+esc(x.profesor)+'</span></td><td>'+esc(x.falta)+'</td><td><span class="pill '+(x.estado==='Pendiente'?'bad':'ok')+'">'+esc(x.estado)+'</span>'+(x.subsanado?'<br><span class="small">'+esc(x.subsanado)+'</span>':'<br><span class="small">Detectado '+esc(x.detectado)+'</span>')+'</td><td class="small">'+esc(x.novedad)+(x.detalle?' — '+esc(x.detalle):'')+'</td><td>'+(x.foto?'<a href="'+esc(x.foto)+'" target="_blank">ver</a>':'')+'</td></tr>').join(''):'<tr><td colspan="6" class="small">Sin pendientes.</td></tr>')+'</table></div></div>';
   }
   if(S.tab==='m1'){
     const txt=S.txt&&S.txtSem===p.semana?S.txt:mensaje(p);
