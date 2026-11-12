@@ -144,6 +144,7 @@ async function paso1(tipo){
     '<label class="small">Motivo de la novedad</label><select id="nov"><option value="">Seleccione…</option>'+S.novedades.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select>'+
     '<textarea id="det" placeholder="Explique la novedad (obligatorio si elige «Otra»)" style="min-height:70px;margin-top:8px"></textarea>'+
     '<div class="row" style="margin-top:10px"><button class="pri" id="ok">Confirmar registro</button><button id="can">Cancelar</button></div></div>';
+  document.getElementById('nv').scrollIntoView({behavior:'smooth',block:'start'});
   document.getElementById('can').onclick=()=>vHoy();
   document.getElementById('ok').onclick=()=>{const n=document.getElementById('nov').value,dt=document.getElementById('det').value.trim();
     if(!n){msg(m,'Seleccione el motivo de la novedad.','e');return}if(n==='Otra'&&dt.length<5){msg(m,'Explique el motivo de la novedad.','e');return}
