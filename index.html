@@ -137,7 +137,7 @@ async function enviar(){
     msg(m,(S.reg.tipo==='llegada'?'Llegada':'Salida')+' registrada a las '+r.hora+'. '+r.estado,'s');setTimeout(vHoy,3000);
   }catch(e){msg(m,e,'e');document.querySelectorAll('#v button').forEach(x=>x.disabled=false)}
 }
-function cumple(r,x){if(r)return '<span class="pill '+(r.novedad||r.extemporaneo?'warn':'ok')+'">✓ '+esc(r.hora)+'</span>'+(r.extemporaneo?'<br><span class="small">Extemporáneo</span>':'');if(x.vencida)return '<span class="pill bad">✗ Pendiente</span>';if(x.enCurso)return '<span class="pill mute">En curso</span>';return '<span class="small">—</span>'}
+function cumple(r,x){if(r)return '<span class="pill '+(r.novedad||r.extemporaneo?'warn':'ok')+'">✓ '+esc(r.hora)+'</span>'+(r.extemporaneo?'<br><span class="small">Extemporáneo</span>':'');if(x.fecha<'2026-11-12')return '<span class="small">Antes del control</span>';if(x.vencida)return '<span class="pill bad">✗ Pendiente</span>';if(x.enCurso)return '<span class="pill mute">En curso</span>';return '<span class="small">—</span>'}
 async function vSem(){
   const v=document.getElementById('v');v.innerHTML='<div class="card">Cargando…</div>';
   let r;try{r=await call('miSemana',S.token)}catch(e){v.innerHTML='<div class="card"><div class="msg e">'+esc(e)+'</div></div>';return}
