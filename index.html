@@ -40,6 +40,7 @@ img.prev{max-width:100%;max-height:260px;border-radius:8px;margin-top:8px}
 
 <script>
 const API='https://script.google.com/macros/s/AKfycbyOLbUG1TkHsapq_mV6mrgnui-09qtZO77r-yZy8NlJiKUJdMCurJTX49J80-H5-kmD/exec';
+const GUIA='https://docs.google.com/presentation/d/1p2eA3DH_iaobi1f8NbXgvnYUbP6RQtGN/edit?usp=sharing';
 const VISTA=new URLSearchParams(location.search).get('vista')||(location.hash==='#panel'?'panel':'');
 const DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -202,7 +203,8 @@ function reg(r,ven){if(!r)return ven?'<span class="pill bad">Sin registro</span>
 function mensaje(p){
   const ini=p.semana,fin=add(ini,6);const fe=Object.keys(p.festivos).filter(x=>x>=ini&&x<=fin);
   let m='👋 Buenos días, profes.\n\nIniciamos la semana del '+fecha(ini).toLowerCase()+' al '+fecha(fin).toLowerCase()+'. Les recordamos cumplir los horarios que cada uno propuso para su taller.\n\n'+
-   '📸 En cada sesión registren su llegada y su salida con foto en este enlace, entrando con su cédula:\n'+p.url+'\n\n'+
+   '📸 En cada sesión registren su llegada y su salida con foto en este enlace, entrando con su cédula:\n'+(p.url||(location.origin+location.pathname))+'\n\n'+
+   '📎 Guía paso a paso:\n'+GUIA+'\n\n'+
    '⚠️ Si dictan en otro horario o lugar, registren igual: la aplicación les pedirá el motivo de la novedad.\n\n'+
    '📧 Si una novedad les impide dictar la sesión, repórtenla a: '+p.correos+'.';
   if(fe.length)m+='\n\n📅 Tengan en cuenta: '+fe.map(x=>fecha(x).toLowerCase()+', festivo ('+p.festivos[x]+')').join('; ')+'.';
