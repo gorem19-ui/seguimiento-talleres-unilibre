@@ -30,7 +30,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.kpi .v{font-size:22px;font-weight:700}
 a{color:var(--pri)}textarea{min-height:200px}
 img.prev{max-width:100%;max-height:260px;border-radius:8px;margin-top:8px}
-.hidden{display:none}
+.hidden{display:none}.cam{display:block;text-align:center;border:2px dashed var(--pri);color:var(--pri);background:var(--pri2);border-radius:10px;padding:14px;font-weight:600;cursor:pointer}
 @media(max-width:600px){.logos img{height:56px}}
 </style>
 </head>
@@ -76,10 +76,10 @@ async function vHoy(){
   v.innerHTML='<div class="card"><h2>'+fecha(r.hoy)+'</h2>'+
    '<p class="sub">'+(r.sesiones.length?'Sesiones programadas hoy: '+r.sesiones.map(s=>h12(s.inicio)+' – '+h12(s.fin)+(s.etiqueta?' ('+esc(s.etiqueta)+')':'')).join(' · '):(r.festivo?'Hoy es festivo: no hay sesiones programadas.':'Hoy no tiene sesiones programadas.'))+'</p>'+
    (r.registros.length?'<div class="row" style="margin-bottom:10px">'+r.registros.map(x=>'<span class="pill '+(/A tiempo|Completa/.test(x.estado)&&!/Fuera|Sin ubic/.test(x.estado)?'ok':'warn')+'">'+(x.tipo==='llegada'?'Llegada':'Salida')+' '+esc(x.hora)+'</span>').join('')+'</div>':'')+
-   '<label class="small">Foto de evidencia (tómela en el lugar del taller, sin estudiantes identificables)</label><input type="file" accept="image/*" capture="environment" id="f"><img id="p" class="prev hidden">'+
+   '<div class="small" style="margin-bottom:6px">Foto de evidencia: tómela en el lugar del taller, sin estudiantes identificables.</div><label for="f" class="cam" id="camL">📷 Tomar foto</label><input type="file" accept="image/*" capture="environment" id="f" class="hidden"><img id="p" class="prev hidden">'+
    '<input type="text" id="o" placeholder="Observación (opcional)" style="margin-top:8px">'+
    '<button class="pri big" id="b" style="margin-top:12px">Registrar '+T+'</button><div id="nv"></div><div id="m"></div></div>';
-  const f=document.getElementById('f');f.onchange=()=>{const p=document.getElementById('p');if(f.files[0]){p.src=URL.createObjectURL(f.files[0]);p.classList.remove('hidden')}};
+  const f=document.getElementById('f');f.onchange=()=>{const p=document.getElementById('p');if(f.files[0]){p.src=URL.createObjectURL(f.files[0]);p.classList.remove('hidden');document.getElementById('camL').textContent='📷 Cambiar foto'}};
   document.getElementById('b').onclick=()=>paso1(tipo);
 }
 function ubicar(){return new Promise(ok=>{if(!navigator.geolocation)return ok(null);navigator.geolocation.getCurrentPosition(p=>ok({lat:p.coords.latitude,lng:p.coords.longitude,precision:Math.round(p.coords.accuracy),origen:'GPS del celular'}),()=>ok(null),{enableHighAccuracy:true,timeout:15000,maximumAge:0})})}
